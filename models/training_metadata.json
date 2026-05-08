@@ -1,0 +1,79 @@
+{
+  "split_info": {
+    "dataset_shape": [
+      253680,
+      22
+    ],
+    "X_train_shape": [
+      202944,
+      21
+    ],
+    "X_test_shape": [
+      50736,
+      21
+    ],
+    "target_distribution_total": {
+      "0": 0.8606669820245979,
+      "1": 0.13933301797540207
+    },
+    "target_distribution_train": {
+      "0": 0.8606659965310628,
+      "1": 0.13933400346893723
+    },
+    "target_distribution_test": {
+      "0": 0.8606709239987386,
+      "1": 0.13932907600126143
+    },
+    "class_balance_ratio_neg_pos": 6.177049736886777,
+    "random_state": 42,
+    "test_size": 0.2
+  },
+  "numeric_cols": [
+    "BMI",
+    "MentHlth",
+    "PhysHlth"
+  ],
+  "ordinal_cols": [
+    "GenHlth",
+    "Age",
+    "Education",
+    "Income"
+  ],
+  "binary_cols": [
+    "HighBP",
+    "HighChol",
+    "CholCheck",
+    "Smoker",
+    "Stroke",
+    "HeartDiseaseorAttack",
+    "PhysActivity",
+    "Fruits",
+    "Veggies",
+    "HvyAlcoholConsump",
+    "AnyHealthcare",
+    "NoDocbcCost",
+    "DiffWalk",
+    "Sex"
+  ],
+  "knn_sample_size_configured": 50000,
+  "knn_sample_size_used": 50000,
+  "output_files": [
+    "baseline_metrics.csv",
+    "best_params.json",
+    "classification_report_best.csv",
+    "confusion_matrix.joblib",
+    "feature_columns.joblib",
+    "feature_importance.csv",
+    "feature_importance_notebook_format.csv",
+    "knn_pipeline.joblib",
+    "logistic_regression_pipeline.joblib",
+    "model_metrics.csv",
+    "model_metrics_notebook_format.csv",
+    "model_metrics_with_dummy.csv",
+    "random_forest_pipeline.joblib",
+    "roc_pr_data.joblib",
+    "threshold_adjustment.joblib",
+    "training_metadata.json",
+    "xgboost_pipeline.joblib"
+  ]
+}

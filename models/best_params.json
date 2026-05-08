@@ -1,0 +1,47 @@
+{
+  "best_params": {
+    "Regresión Logística": {
+      "model__C": 1,
+      "model__class_weight": "balanced",
+      "model__penalty": "l2"
+    },
+    "KNN": {
+      "model__metric": "minkowski",
+      "model__n_neighbors": 5,
+      "model__weights": "distance"
+    },
+    "Random Forest": {
+      "model__n_estimators": 150,
+      "model__min_samples_split": 10,
+      "model__min_samples_leaf": 5,
+      "model__max_features": "log2",
+      "model__max_depth": null,
+      "model__class_weight": "balanced"
+    },
+    "XGBoost": {
+      "model__subsample": 0.8,
+      "model__scale_pos_weight": 6.176998974431517,
+      "model__n_estimators": 300,
+      "model__min_child_weight": 1,
+      "model__max_depth": 4,
+      "model__learning_rate": 0.1,
+      "model__colsample_bytree": 1.0
+    }
+  },
+  "best_cv_scores_f1": {
+    "Regresión Logística": 0.44320081010703455,
+    "KNN": 0.2791222952643436,
+    "Random Forest": 0.46336925644063615,
+    "XGBoost": 0.44388764597409736
+  },
+  "fit_times_seconds": {
+    "Dummy Classifier": 0.18215417861938477,
+    "Regresión Logística": 16.62410020828247,
+    "KNN": 70.65626001358032,
+    "Random Forest": 502.5878086090088,
+    "XGBoost": 67.23752784729004
+  },
+  "best_model_by_f1": "Random Forest",
+  "best_model_by_f1_dashboard_name": "Random Forest",
+  "scale_pos_weight_xgb": 6.176998974431517
+}
