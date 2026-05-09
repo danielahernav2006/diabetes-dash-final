@@ -1,2 +1,0 @@
-model,accuracy,precision,recall,f1,roc_auc,pr_auc
-Dummy Classifier,0.8606709239987386,0.0,0.0,0.0,0.5,0.13932907600126143

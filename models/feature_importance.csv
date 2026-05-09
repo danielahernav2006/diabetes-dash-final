@@ -1,22 +1,16 @@
-feature,importance,model
-BMI,0.16190931624007934,Random Forest
-GenHlth,0.15940644949268404,Random Forest
-HighBP,0.13966417259662875,Random Forest
-Age,0.11692124568980243,Random Forest
-Income,0.06215265138348838,Random Forest
-HighChol,0.05938965809559542,Random Forest
-PhysHlth,0.0530801820243337,Random Forest
-MentHlth,0.03769238800944806,Random Forest
-Education,0.03630358475018611,Random Forest
-DiffWalk,0.03460153543997349,Random Forest
-HeartDiseaseorAttack,0.02188779200945952,Random Forest
-Sex,0.019388924753700455,Random Forest
-Smoker,0.019107796379845936,Random Forest
-Fruits,0.018472330045327102,Random Forest
-PhysActivity,0.01654192355703322,Random Forest
-Veggies,0.01307798078033101,Random Forest
-HvyAlcoholConsump,0.008796476920758812,Random Forest
-CholCheck,0.006421962086523249,Random Forest
-NoDocbcCost,0.006377049488584688,Random Forest
-Stroke,0.005014723019458967,Random Forest
-AnyHealthcare,0.0037918572367573416,Random Forest
+﻿Variable,Importancia
+HighBP,0.564213
+GenHlth,0.10689439
+HighChol,0.07691825
+DiffWalk,0.04650654
+Age,0.039758153
+BMI,0.038008828
+HeartDiseaseorAttack,0.034799807
+CholCheck,0.021275975
+HvyAlcoholConsump,0.019363182
+Income,0.01284306
+Sex,0.011308019
+Stroke,0.0056603844
+Veggies,0.0036062337
+Education,0.003041793
+MentHlth,0.0029593222

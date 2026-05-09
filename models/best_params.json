@@ -1,47 +1,165 @@
 {
-  "best_params": {
-    "Regresión Logística": {
-      "model__C": 1,
-      "model__class_weight": "balanced",
-      "model__penalty": "l2"
+    "Regresión Logística + none": {
+        "best_params": {
+            "C": 3.4702669886504163,
+            "penalty": "l2"
+        },
+        "best_value": 0.15811390328119587,
+        "n_trials": 30
     },
-    "KNN": {
-      "model__metric": "minkowski",
-      "model__n_neighbors": 5,
-      "model__weights": "distance"
+    "Regresión Logística + class_weight": {
+        "best_params": {
+            "C": 0.0010301074891557013,
+            "penalty": "l1"
+        },
+        "best_value": 0.771793202245575,
+        "n_trials": 30
     },
-    "Random Forest": {
-      "model__n_estimators": 150,
-      "model__min_samples_split": 10,
-      "model__min_samples_leaf": 5,
-      "model__max_features": "log2",
-      "model__max_depth": null,
-      "model__class_weight": "balanced"
+    "Regresión Logística + smote": {
+        "best_params": {
+            "C": 1.2673263875515566,
+            "penalty": "l2"
+        },
+        "best_value": 0.5541957649724806,
+        "n_trials": 30
     },
-    "XGBoost": {
-      "model__subsample": 0.8,
-      "model__scale_pos_weight": 6.176998974431517,
-      "model__n_estimators": 300,
-      "model__min_child_weight": 1,
-      "model__max_depth": 4,
-      "model__learning_rate": 0.1,
-      "model__colsample_bytree": 1.0
+    "Regresión Logística + adasyn": {
+        "best_params": {
+            "C": 0.778750172539758,
+            "penalty": "l2"
+        },
+        "best_value": 0.551437363137602,
+        "n_trials": 30
+    },
+    "Random Forest + none": {
+        "best_params": {
+            "n_estimators": 90,
+            "max_depth": 20,
+            "min_samples_split": 5,
+            "min_samples_leaf": 1,
+            "max_features": "sqrt"
+        },
+        "best_value": 0.1514654015609973,
+        "n_trials": 30
+    },
+    "Random Forest + class_weight": {
+        "best_params": {
+            "n_estimators": 70,
+            "max_depth": 6,
+            "min_samples_split": 12,
+            "min_samples_leaf": 4,
+            "max_features": "log2"
+        },
+        "best_value": 0.7843118705580296,
+        "n_trials": 30
+    },
+    "Random Forest + smote": {
+        "best_params": {
+            "n_estimators": 50,
+            "max_depth": 6,
+            "min_samples_split": 9,
+            "min_samples_leaf": 3,
+            "max_features": "log2"
+        },
+        "best_value": 0.40478083257359454,
+        "n_trials": 30
+    },
+    "Random Forest + adasyn": {
+        "best_params": {
+            "n_estimators": 50,
+            "max_depth": 6,
+            "min_samples_split": 10,
+            "min_samples_leaf": 9,
+            "max_features": "sqrt"
+        },
+        "best_value": 0.3950557516911221,
+        "n_trials": 30
+    },
+    "XGBoost + none": {
+        "best_params": {
+            "n_estimators": 250,
+            "max_depth": 8,
+            "learning_rate": 0.08960785365368121,
+            "subsample": 0.8795975452591109,
+            "colsample_bytree": 0.7468055921327309,
+            "min_child_weight": 2,
+            "gamma": 0.2904180608409973,
+            "reg_alpha": 2.1423021757741068,
+            "reg_lambda": 1.5930522616241019
+        },
+        "best_value": 0.17763499275278039,
+        "n_trials": 30
+    },
+    "XGBoost + class_weight": {
+        "best_params": {
+            "n_estimators": 250,
+            "max_depth": 3,
+            "learning_rate": 0.07330363323201568,
+            "subsample": 0.8881396659208,
+            "colsample_bytree": 0.8734057606392117,
+            "min_child_weight": 9,
+            "gamma": 3.33992554136246,
+            "reg_alpha": 2.9994656530903776,
+            "reg_lambda": 1.4303854290589637
+        },
+        "best_value": 0.7961592174753663,
+        "n_trials": 30
+    },
+    "XGBoost + smote": {
+        "best_params": {
+            "n_estimators": 450,
+            "max_depth": 3,
+            "learning_rate": 0.010215357031663454,
+            "subsample": 0.8634899515157878,
+            "colsample_bytree": 0.8116465913707888,
+            "min_child_weight": 10,
+            "gamma": 3.010623828752643,
+            "reg_alpha": 0.007778709837383242,
+            "reg_lambda": 0.18636556724441458
+        },
+        "best_value": 0.3529716289173441,
+        "n_trials": 30
+    },
+    "XGBoost + adasyn": {
+        "best_params": {
+            "n_estimators": 150,
+            "max_depth": 3,
+            "learning_rate": 0.03591201956051712,
+            "subsample": 0.8070111909124212,
+            "colsample_bytree": 0.9098085821625351,
+            "min_child_weight": 5,
+            "gamma": 3.5387105580161764,
+            "reg_alpha": 0.02012683662461886,
+            "reg_lambda": 8.912490550951178
+        },
+        "best_value": 0.315980669495521,
+        "n_trials": 30
+    },
+    "KNN + none": {
+        "best_params": {
+            "n_neighbors": 3,
+            "weights": "uniform",
+            "metric": "euclidean"
+        },
+        "best_value": 0.24454456946263026,
+        "n_trials": 30
+    },
+    "KNN + smote": {
+        "best_params": {
+            "n_neighbors": 151,
+            "weights": "uniform",
+            "metric": "euclidean"
+        },
+        "best_value": 0.6390701861015962,
+        "n_trials": 30
+    },
+    "KNN + adasyn": {
+        "best_params": {
+            "n_neighbors": 139,
+            "weights": "uniform",
+            "metric": "euclidean"
+        },
+        "best_value": 0.6469565366919412,
+        "n_trials": 30
     }
-  },
-  "best_cv_scores_f1": {
-    "Regresión Logística": 0.44320081010703455,
-    "KNN": 0.2791222952643436,
-    "Random Forest": 0.46336925644063615,
-    "XGBoost": 0.44388764597409736
-  },
-  "fit_times_seconds": {
-    "Dummy Classifier": 0.18215417861938477,
-    "Regresión Logística": 16.62410020828247,
-    "KNN": 70.65626001358032,
-    "Random Forest": 502.5878086090088,
-    "XGBoost": 67.23752784729004
-  },
-  "best_model_by_f1": "Random Forest",
-  "best_model_by_f1_dashboard_name": "Random Forest",
-  "scale_pos_weight_xgb": 6.176998974431517
 }

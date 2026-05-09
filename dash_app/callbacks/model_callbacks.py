@@ -29,8 +29,11 @@ from src.utils.model_utils import (
     predict_with_model,
 )
 from src.utils.model_figures import (
-    fig_confusion_matrix, fig_feature_importance, fig_metrics_comparison,
+    fig_class_imbalance, fig_confusion_matrix, fig_feature_importance,
+    fig_metrics_comparison,
     fig_pr_curves, fig_roc_curves,
+    # Nuevas figuras añadidas en el rediseño de la pestaña de Predicción
+    fig_proba_distribution, fig_threshold_tradeoff, fig_three_metric_heatmaps,
 )
 
 
@@ -63,31 +66,123 @@ SIM_DEFAULTS = {
 # ──────────────────────────────────────────────────────────────────────────────
 
 # Comentario corto interpretativo según el modelo (acompaña los KPIs dinámicos)
-def _interpretation_text(name: str, row: dict) -> str:
-    f1 = row.get("f1", 0) or 0
-    rec = row.get("recall", 0) or 0
-    prec = row.get("precision", 0) or 0
-    if name == "Random Forest":
+def _interpretation_text(model_key, r):
+    """
+    Genera una interpretación cualitativa para el bloque azul del explorador
+    de modelos. Evita repetir solo las métricas y explica el comportamiento
+    de la combinación modelo + balanceo.
+    """
+
+    model_base = str(r.get("model_base", "")).strip()
+    balance = str(r.get("balance_strategy", "")).strip()
+
+    recall = float(r.get("recall", 0))
+    precision = float(r.get("precision", 0))
+    accuracy = float(r.get("accuracy", 0))
+    f1 = float(r.get("f1", 0))
+
+    balance_labels = {
+        "none": "sin balanceo",
+        "class_weight": "class weight",
+        "smote": "SMOTE",
+        "adasyn": "ADASYN",
+    }
+
+    balance_label = balance_labels.get(balance, balance)
+
+    # Caso especial: modelo recomendado
+    if model_base == "XGBoost" and balance == "class_weight":
         return (
-            f"Equilibra recall ({rec*100:.1f}%) y precision ({prec*100:.1f}%) "
-            f"y obtiene el F1 más alto ({f1*100:.1f}%). Es el modelo recomendado."
+            "Interpretación rápida: esta es la combinación recomendada porque prioriza la detección "
+            "de la clase positiva. Su principal fortaleza es identificar una alta proporción de personas "
+            "con prediabetes/diabetes, aunque esto implica aceptar una precisión moderada y una mayor cantidad "
+            "de falsos positivos. Es adecuada cuando el objetivo principal es reducir los casos positivos no detectados."
         )
-    if name == "XGBoost":
+
+    # Modelos sin balanceo
+    if balance == "none":
+        if recall < 0.30 and accuracy >= 0.80:
+            return (
+                "Interpretación rápida: aunque la accuracy parece alta, este resultado puede ser engañoso "
+                "por el desbalance del dataset. El modelo tiende a favorecer la clase mayoritaria y presenta "
+                "baja capacidad para detectar correctamente los casos de prediabetes/diabetes."
+            )
+
         return (
-            f"Recall muy alto ({rec*100:.1f}%): detecta gran parte de los "
-            f"positivos, aunque con precision moderada ({prec*100:.1f}%)."
+            "Interpretación rápida: esta configuración funciona como punto de referencia, ya que permite observar "
+            "cómo se comporta el modelo sin aplicar correcciones frente al desbalance de clases. En general, puede "
+            "favorecer la clase mayoritaria y perder sensibilidad frente a la clase positiva."
         )
-    if name == "Logistic Regression":
+
+    # Class weight
+    if balance == "class_weight":
+        if recall >= 0.70:
+            return (
+                f"Interpretación rápida: al usar {balance_label}, el modelo aumenta la atención sobre la clase "
+                "minoritaria y mejora la detección de casos positivos. Esta configuración es útil cuando se busca "
+                "priorizar el recall sin modificar directamente la distribución original de los datos."
+            )
+
         return (
-            "Modelo lineal con `class_weight='balanced'`. Es interpretable y "
-            f"alcanza un recall de {rec*100:.1f}%, útil como base de comparación."
+            f"Interpretación rápida: {balance_label} ajusta el peso de las clases durante el entrenamiento. "
+            "Su objetivo es reducir el sesgo hacia la clase mayoritaria, aunque en esta combinación el aumento "
+            "de sensibilidad frente a la clase positiva es más moderado."
         )
-    if name == "KNN":
+
+    # SMOTE
+    if balance == "smote":
+        if recall >= 0.55:
+            return (
+                "Interpretación rápida: SMOTE ayuda al modelo a reconocer mejor la clase positiva al generar "
+                "ejemplos sintéticos de prediabetes/diabetes durante el entrenamiento. Esta estrategia puede mejorar "
+                "la detección, aunque su desempeño depende de qué tan representativos sean los casos sintéticos creados."
+            )
+
         return (
-            f"Accuracy aparentemente alto, pero recall muy bajo ({rec*100:.1f}%): "
-            "no detecta bien la clase positiva en este dataset desbalanceado."
+            "Interpretación rápida: SMOTE introduce ejemplos sintéticos de la clase minoritaria, pero en esta combinación "
+            "no logra una mejora tan fuerte en la detección de positivos. Esto puede indicar que las clases siguen estando "
+            "muy solapadas o que el modelo no aprovecha completamente el sobremuestreo."
         )
-    return f"F1: {f1*100:.1f}% · Recall: {rec*100:.1f}% · Precision: {prec*100:.1f}%."
+
+    # ADASYN
+    if balance == "adasyn":
+        if model_base == "KNN":
+            return (
+                "Interpretación rápida: ADASYN fue la estrategia más favorable para KNN bajo el criterio de recall. "
+                "Al generar ejemplos sintéticos en las zonas más difíciles de clasificar, ayuda a que el modelo encuentre "
+                "más vecinos representativos de la clase positiva. Aun así, KNN sigue siendo sensible a la distribución "
+                "local de los datos y a la escala de las variables."
+            )
+
+        return (
+            "Interpretación rápida: ADASYN concentra el sobremuestreo en los casos positivos más difíciles de aprender. "
+            "Esto puede mejorar la sensibilidad del modelo, pero también puede aumentar los falsos positivos si las zonas "
+            "difíciles están muy mezcladas con la clase mayoritaria."
+        )
+
+    # Fallback general según patrón de métricas
+    if recall >= 0.70 and precision < 0.40:
+        return (
+            "Interpretación rápida: el modelo presenta alta sensibilidad para detectar casos positivos, aunque con precisión "
+            "moderada. Esto indica que identifica muchas personas en riesgo, pero también puede generar más alertas falsas."
+        )
+
+    if recall < 0.35 and accuracy >= 0.80:
+        return (
+            "Interpretación rápida: el modelo obtiene buenos aciertos globales, pero detecta pocos casos positivos. "
+            "Este comportamiento es típico en datasets desbalanceados cuando el modelo favorece la clase mayoritaria."
+        )
+
+    if f1 >= 0.45:
+        return (
+            "Interpretación rápida: esta combinación ofrece un equilibrio razonable entre detección de positivos y control "
+            "de falsos positivos. Puede considerarse una alternativa intermedia cuando no se quiere priorizar únicamente recall."
+        )
+
+    return (
+        "Interpretación rápida: esta configuración permite comparar cómo cambia el comportamiento del modelo bajo una técnica "
+        "específica de balanceo. Su utilidad principal está en observar el intercambio entre recall, precisión y desempeño global."
+    )
 
 
 def _models_table(df):
@@ -199,7 +294,7 @@ def _initial_result_panel():
                         html.Ul(
                             [
                                 html.Li("Completa los 4 grupos del formulario."),
-                                html.Li("Elige el modelo a utilizar."),
+                                html.Li("Revisa los valores del perfil."),
                                 html.Li("Ejecuta la predicción."),
                             ],
                             style={"fontSize": "0.84rem", "color": "#5D6D7E",
@@ -465,82 +560,241 @@ def register_model_callbacks(app):
 
     # ── 1) KPIs y métricas del modelo recomendado (estáticos, una sola vez) ──
     @app.callback(
-        Output("rec-kpi-acc",       "children"),
-        Output("rec-kpi-acc-sub",   "children"),
-        Output("rec-kpi-prec",      "children"),
-        Output("rec-kpi-prec-sub",  "children"),
-        Output("rec-kpi-rec",       "children"),
-        Output("rec-kpi-rec-sub",   "children"),
-        Output("rec-kpi-f1",        "children"),
-        Output("rec-kpi-f1-sub",    "children"),
-        Output("rec-kpi-roc",       "children"),
-        Output("rec-kpi-roc-sub",   "children"),
-        Output("rec-kpi-pr",        "children"),
-        Output("rec-kpi-pr-sub",    "children"),
-        Output("recommended-model-name", "children"),
-        Input("recommended-model-name", "id"),  # dispara al cargar el layout
+    Output("rec-kpi-acc", "children"),
+    Output("rec-kpi-acc-sub", "children"),
+    Output("rec-kpi-prec", "children"),
+    Output("rec-kpi-prec-sub", "children"),
+    Output("rec-kpi-rec", "children"),
+    Output("rec-kpi-rec-sub", "children"),
+    Output("rec-kpi-f1", "children"),
+    Output("rec-kpi-f1-sub", "children"),
+    Output("rec-kpi-roc", "children"),
+    Output("rec-kpi-roc-sub", "children"),
+    Output("rec-kpi-pr", "children"),
+    Output("rec-kpi-pr-sub", "children"),
+    Output("recommended-model-name", "children"),
+    Output("recommended-balance-technique", "children"),
+    Output("recommended-model-context", "children"),
+    Output("recommended-criterion", "children"),
+    Output("recommended-dataset-note", "children"),
+    Input("recommended-model-name", "id"),
     )
+    
     def fill_recommended_kpis(_):
         df = get_metrics_df()
+
         if df.empty:
             dash = "—"
-            return (dash, dash, dash, dash, dash, dash, dash, dash,
-                    dash, dash, dash, dash, "Random Forest")
+            return (
+                dash, dash,
+                dash, dash,
+                dash, dash,
+                dash, dash,
+                dash, dash,
+                dash, dash,
+                "XGBoost",
+                "Técnica de balanceo: —",
+                "No se encontraron métricas disponibles para construir la recomendación.",
+                "Criterio principal: Recall",
+                "Dataset desbalanceado",
+            )
+
         best = get_best_model_name()
         row = df[df["model"] == best]
         if row.empty:
             row = df.iloc[[0]]
+
         r = row.iloc[0]
-        acc  = fmt_pct(r["accuracy"])
+
+        balance_labels = {
+            "none": "Sin balanceo",
+            "class_weight": "Class weight",
+            "smote": "SMOTE",
+            "adasyn": "ADASYN",
+        }
+
+        base_model = str(r.get("model_base", best.split("+")[0].strip()))
+        balance_strategy = str(
+            r.get(
+                "balance_strategy",
+                best.split("+")[1].strip() if "+" in best else "none"
+            )
+        )
+        balance_label = balance_labels.get(balance_strategy, balance_strategy)
+
+        acc = fmt_pct(r["accuracy"])
         prec = fmt_pct(r["precision"])
-        rec  = fmt_pct(r["recall"])
-        f1   = fmt_pct(r["f1"])
-        roc  = fmt_pct(r["roc_auc"])
-        prx  = fmt_pct(r["pr_auc"])
-        return (
-            acc,  "Aciertos sobre el total",
-            prec, "Confiabilidad de positivos",
-            rec,  "Detección de la clase positiva",
-            f1,   "Equilibrio precision/recall",
-            roc,  "Capacidad de discriminación",
-            prx,  "Desempeño en clase minoritaria",
-            MODEL_LABELS_ES.get(best, best),
+        rec = fmt_pct(r["recall"])
+        f1 = fmt_pct(r["f1"])
+        roc = fmt_pct(r["roc_auc"])
+        prx = fmt_pct(r["pr_auc"])
+
+        context = (
+            f"{base_model} fue seleccionado como modelo recomendado porque obtuvo el mayor recall "
+            f"en el conjunto de prueba ({rec}), criterio priorizado en este proyecto para maximizar "
+            f"la detección de personas con prediabetes/diabetes. "
+            f"Se utiliza la técnica de balanceo {balance_label}, adecuada para un dataset desbalanceado. "
+            f"Aunque la precision ({prec}) es más moderada, esta combinación resulta conveniente cuando "
+            f"el costo de no detectar casos positivos es alto."
         )
 
-    # ── 2) Selector de modelos: descripción + KPIs dinámicos ─────────────────
-    @app.callback(
-        Output("explorer-model-name",         "children"),
-        Output("explorer-model-description",  "children"),
-        Output("explorer-model-interpretation", "children"),
-        Output("exp-kpi-acc",   "children"),
-        Output("exp-kpi-prec",  "children"),
-        Output("exp-kpi-rec",   "children"),
-        Output("exp-kpi-f1",    "children"),
-        Output("exp-kpi-roc",   "children"),
-        Output("exp-kpi-pr",    "children"),
-        Output("exp-kpi-acc-sub",  "children"),
-        Output("exp-kpi-prec-sub", "children"),
-        Output("exp-kpi-rec-sub",  "children"),
-        Output("exp-kpi-f1-sub",   "children"),
-        Output("exp-kpi-roc-sub",  "children"),
-        Output("exp-kpi-pr-sub",   "children"),
-        Input("model-explorer-select", "value"),
-    )
-    def update_model_explorer(model_name):
-        df = get_metrics_df()
-        if df.empty or model_name is None:
-            dash = "—"
-            return (dash, dash, dash, *([dash] * 6), *([""] * 6))
+        return (
+            acc, "Aciertos sobre el total",
+            prec, "Confiabilidad de positivos",
+            rec, "Detención de la clase positiva",
+            f1, "Equilibrio entre precision y recall",
+            roc, "Capacidad de discriminación",
+            prx, "Desempeño en clase minoritaria",
+            base_model,
+            f"Técnica de balanceo: {balance_label}",
+            context,
+            "Criterio principal: Recall",
+            "Dataset desbalanceado",
+        )
 
-        row_match = df[df["model"] == model_name]
+    
+    # ── 2A) Opciones de balanceo según el modelo base ───────────────────────
+    @app.callback(
+        Output("balance-technique-radio", "options"),
+        Output("balance-technique-radio", "value"),
+        Input("model-base-dropdown", "value"),
+    )
+    def update_balance_options(selected_model):
+        options_map = {
+            "Regresión Logística": [
+                {"label": "Sin balanceo", "value": "none"},
+                {"label": "Class weight", "value": "class_weight"},
+                {"label": "SMOTE", "value": "smote"},
+                {"label": "ADASYN", "value": "adasyn"},
+            ],
+            "Random Forest": [
+                {"label": "Sin balanceo", "value": "none"},
+                {"label": "Class weight", "value": "class_weight"},
+                {"label": "SMOTE", "value": "smote"},
+                {"label": "ADASYN", "value": "adasyn"},
+            ],
+            "XGBoost": [
+                {"label": "Sin balanceo", "value": "none"},
+                {"label": "Class weight", "value": "class_weight"},
+                {"label": "SMOTE", "value": "smote"},
+                {"label": "ADASYN", "value": "adasyn"},
+            ],
+            "KNN": [
+                {"label": "Sin balanceo", "value": "none"},
+                {"label": "SMOTE", "value": "smote"},
+                {"label": "ADASYN", "value": "adasyn"},
+            ],
+        }
+
+        default_map = {
+            "Regresión Logística": "class_weight",
+            "Random Forest": "class_weight",
+            "XGBoost": "class_weight",
+            "KNN": "adasyn",
+        }
+
+        return options_map.get(selected_model, []), default_map.get(selected_model)
+    
+     # ── 2B) Selector de modelos: descripción + KPIs dinámicos ────────────────
+    @app.callback(
+        Output("selected-combination-summary", "children"),
+        Output("explorer-model-name", "children"),
+        Output("explorer-model-description", "children"),
+        Output("explorer-model-interpretation", "children"),
+        Output("exp-kpi-acc", "children"),
+        Output("exp-kpi-prec", "children"),
+        Output("exp-kpi-rec", "children"),
+        Output("exp-kpi-f1", "children"),
+        Output("exp-kpi-roc", "children"),
+        Output("exp-kpi-pr", "children"),
+        Output("exp-kpi-acc-sub", "children"),
+        Output("exp-kpi-prec-sub", "children"),
+        Output("exp-kpi-rec-sub", "children"),
+        Output("exp-kpi-f1-sub", "children"),
+        Output("exp-kpi-roc-sub", "children"),
+        Output("exp-kpi-pr-sub", "children"),
+        Input("model-base-dropdown", "value"),
+        Input("balance-technique-radio", "value"),
+    )
+    def update_model_explorer(model_base, balanceo):
+        df = get_metrics_df()
+
+        dash = "—"
+
+        if df.empty or model_base is None or balanceo is None:
+            return (
+                dbc.Alert("No hay información disponible para esta combinación.", color="warning"),
+                dash, dash, dash,
+                *([dash] * 6),
+                *([""] * 6),
+            )
+
+        row_match = df[
+            (df["model_base"] == model_base) &
+            (df["balance_strategy"] == balanceo)
+        ]
+
         if row_match.empty:
-            row_match = df.iloc[[0]]
+            return (
+                dbc.Alert("No se encontró información para esta combinación.", color="warning"),
+                model_base,
+                "No hay descripción disponible para esta combinación.",
+                "Selecciona otra técnica de balanceo para revisar sus métricas.",
+                *([dash] * 6),
+                *([""] * 6),
+            )
+
         r = row_match.iloc[0].to_dict()
 
+        balance_labels = {
+            "none": "Sin balanceo",
+            "class_weight": "Class weight",
+            "smote": "SMOTE",
+            "adasyn": "ADASYN",
+        }
+
+        balance_label = balance_labels.get(balanceo, balanceo)
+        model_key = r.get("model", f"{model_base} + {balanceo}")
+
+        summary = html.Div(
+            [
+                html.Div("Configuración seleccionada", className="summary-title"),
+                html.Div(
+                    [
+                        html.Span("Modelo base: ", className="summary-label"),
+                        html.Span(model_base, className="summary-value"),
+                    ]
+                ),
+                html.Div(
+                    [
+                        html.Span("Técnica de balanceo: ", className="summary-label"),
+                        html.Span(balance_label, className="summary-value"),
+                    ]
+                ),
+                html.Div(
+                    [
+                        html.Span("Recall en test: ", className="summary-label"),
+                        html.Span(fmt_pct(r["recall"]), className="summary-value emphasis"),
+                    ]
+                ),
+            ],
+            className="summary-box",
+        )
+
         return (
-            MODEL_LABELS_ES.get(model_name, model_name),
-            MODEL_DESCRIPTIONS.get(model_name, ""),
-            _interpretation_text(model_name, r),
+            summary,
+            f"{model_base} + {balance_label}",
+            MODEL_DESCRIPTIONS.get(
+                model_key,
+                MODEL_DESCRIPTIONS.get(
+                    f"{model_base} + {balanceo}",
+                    MODEL_DESCRIPTIONS.get(
+                        f"{model_base} + {balance_label}",
+                        MODEL_DESCRIPTIONS.get(model_base, "")
+                    )
+                )
+            ),
+            _interpretation_text(model_key, r),
             fmt_pct(r["accuracy"]),
             fmt_pct(r["precision"]),
             fmt_pct(r["recall"]),
@@ -554,47 +808,230 @@ def register_model_callbacks(app):
             "Discriminación",
             "Clase minoritaria",
         )
+        
+        
 
     # ── 3) Simulador: predicción al hacer clic ───────────────────────────────
+    
+    def _prediction_result_panel(pred_class, pred_prob):
+        """Panel visual para mostrar el resultado de la simulación."""
+
+        is_positive = int(pred_class) == 1
+
+        if pred_prob is None:
+            prob_text = "No disponible"
+            prob_pct = None
+        else:
+            prob_pct = float(pred_prob) * 100
+            prob_text = f"{prob_pct:.2f}%"
+
+        if is_positive:
+            title = "Prediabetes / Diabetes"
+            subtitle = "El modelo clasifica este perfil dentro del grupo positivo."
+            badge = "Riesgo estimado positivo"
+            accent = "#C0392B"
+            bg = "linear-gradient(180deg, #FFF7F6 0%, #FFFFFF 100%)"
+            icon = "fa-solid fa-triangle-exclamation"
+        else:
+            title = "Sin diabetes"
+            subtitle = "El modelo clasifica este perfil dentro del grupo sin diabetes."
+            badge = "Riesgo estimado bajo"
+            accent = "#1E8449"
+            bg = "linear-gradient(180deg, #F4FFF8 0%, #FFFFFF 100%)"
+            icon = "fa-solid fa-circle-check"
+
+        return dbc.Card(
+            dbc.CardBody(
+                [
+                    html.Div(
+                        [
+                            html.Span(
+                                [
+                                    html.I(className=icon, style={"marginRight": "8px"}),
+                                    badge,
+                                ],
+                                style={
+                                    "display": "inline-flex",
+                                    "alignItems": "center",
+                                    "padding": "7px 12px",
+                                    "borderRadius": "999px",
+                                    "backgroundColor": "#FFFFFF",
+                                    "border": f"1px solid {accent}",
+                                    "color": accent,
+                                    "fontSize": "0.78rem",
+                                    "fontWeight": "800",
+                                    "letterSpacing": "0.04em",
+                                    "textTransform": "uppercase",
+                                    "marginBottom": "14px",
+                                },
+                            ),
+                        ]
+                    ),
+
+                    html.H3(
+                        title,
+                        style={
+                            "fontSize": "2rem",
+                            "fontWeight": "900",
+                            "color": "#0F2447",
+                            "marginBottom": "8px",
+                        },
+                    ),
+
+                    html.P(
+                        subtitle,
+                        style={
+                            "fontSize": "0.95rem",
+                            "color": "#5D6D7E",
+                            "lineHeight": "1.7",
+                            "marginBottom": "18px",
+                        },
+                    ),
+
+                    html.Div(
+                        [
+                            html.Div(
+                                "Probabilidad estimada",
+                                style={
+                                    "fontSize": "0.78rem",
+                                    "fontWeight": "800",
+                                    "textTransform": "uppercase",
+                                    "letterSpacing": "0.06em",
+                                    "color": "#5D6D7E",
+                                    "marginBottom": "4px",
+                                },
+                            ),
+                            html.Div(
+                                prob_text,
+                                style={
+                                    "fontSize": "2.4rem",
+                                    "fontWeight": "900",
+                                    "color": accent,
+                                    "lineHeight": "1.1",
+                                },
+                            ),
+                        ],
+                        style={
+                            "backgroundColor": "#F8FBFF",
+                            "border": "1px solid #DDE7F2",
+                            "borderRadius": "16px",
+                            "padding": "16px 18px",
+                            "marginBottom": "16px",
+                        },
+                    ),
+
+                    html.Div(
+                        [
+                            html.I(
+                                className="fa-solid fa-circle-info",
+                                style={"marginRight": "8px", "color": "#4A7FC1"},
+                            ),
+                            html.Span(
+                                "Este resultado es una estimación académica generada por el modelo final "
+                                "XGBoost + Class weight. No reemplaza una valoración médica.",
+                            ),
+                        ],
+                        style={
+                            "display": "flex",
+                            "alignItems": "flex-start",
+                            "fontSize": "0.84rem",
+                            "lineHeight": "1.6",
+                            "color": "#5D6D7E",
+                            "backgroundColor": "#EEF5FC",
+                            "borderLeft": "4px solid #4A7FC1",
+                            "borderRadius": "10px",
+                            "padding": "12px 14px",
+                        },
+                    ),
+                ],
+                className="p-4",
+            ),
+            className="border-0 shadow-sm",
+            style={
+                "borderRadius": "18px",
+                "background": bg,
+                "borderTop": f"4px solid {accent}",
+                "marginTop": "18px",
+            },
+        )
+
+
+    def _error_result_panel(message):
+        """Panel de error para el simulador."""
+        return dbc.Alert(
+            [
+                html.Strong("No fue posible calcular la predicción. "),
+                html.Span(message),
+            ],
+            color="danger",
+            style={
+                "borderRadius": "12px",
+                "fontSize": "0.9rem",
+                "lineHeight": "1.6",
+            },
+        )
+    
+    
+    
+    
     @app.callback(
         Output("sim-result-panel", "children"),
         Input("sim-predict-button", "n_clicks"),
-        State("sim-model-select", "value"),
         *[State(f"sim-{name}", "value") for name in SIM_INPUT_FIELDS],
         prevent_initial_call=True,
     )
-    def run_simulation(n_clicks, model_name, *values):
+    def run_simulation(n_clicks, *values):
         if not n_clicks:
             return no_update
 
-        form = dict(zip(SIM_INPUT_FIELDS, values))
-        # Saneamiento básico: forzar BMI a número
-        try:
-            if form.get("BMI") is not None:
-                form["BMI"] = float(form["BMI"])
-        except Exception:
-            form["BMI"] = 27.0
+        # Modelo fijo recomendado para la simulación
+        selected_model = "Mejor modelo"
 
-        label, prob = predict_with_model(model_name or get_best_model_name(),
-                                         form)
-        return _build_result_panel(model_name or get_best_model_name(),
-                                   label, prob)
+        form_values = dict(zip(SIM_INPUT_FIELDS, values))
 
+        pred_class, pred_prob = predict_with_model(selected_model, form_values)
+
+        if pred_class is None:
+            return _error_result_panel(
+                "No fue posible calcular la predicción. Verifica que el modelo final esté disponible en la carpeta models/."
+            )
+
+        return _prediction_result_panel(pred_class, pred_prob)
     # ── 4) Gráficas de evaluación del mejor modelo ───────────────────────────
     @app.callback(
+        Output("ml-class-imbalance", "figure"),
         Output("ml-confusion-matrix", "figure"),
-        Output("ml-roc-curve",        "figure"),
-        Output("ml-pr-curve",         "figure"),
         Output("ml-feature-importance", "figure"),
         Input("ml-confusion-matrix", "id"),  # dummy: dispara al cargar
     )
     def render_evaluation_figures(_):
-        cm = get_confusion_matrix()
-        f_cm  = fig_confusion_matrix(cm)
-        f_roc = fig_roc_curves()              # todas las curvas
-        f_pr  = fig_pr_curves()
+        f_imb = fig_class_imbalance()
+        f_cm  = fig_confusion_matrix()
         f_imp = fig_feature_importance(top_n=12)
-        return f_cm, f_roc, f_pr, f_imp
+        return f_imb, f_cm, f_imp
+
+    @app.callback(
+        Output("ml-roc-curve", "figure"),
+        Output("ml-pr-curve", "figure"),
+        Output("ml-curves-note", "children"),
+        Input("ml-curve-model-selector", "value"),
+    )
+    def render_curve_figures(selected_models):
+        note = ""
+        if isinstance(selected_models, str):
+            selected_models = [selected_models]
+        if not selected_models:
+            selected_models = None
+            note = "No hay modelos seleccionados; se muestran todas las curvas disponibles."
+        elif len(selected_models) == 1:
+            note = "Solo hay una curva seleccionada para la comparación."
+        else:
+            note = f"{len(selected_models)} curvas seleccionadas para comparar modelos base."
+        return (
+            fig_roc_curves(selected_models=selected_models),
+            fig_pr_curves(selected_models=selected_models),
+            note,
+        )
 
     # ── 5) Tabla comparativa de modelos ──────────────────────────────────────
     @app.callback(
@@ -612,7 +1049,7 @@ def register_model_callbacks(app):
     )
     def render_comparison_graph(metrics):
         if not metrics:
-            metrics = ["f1"]
+            metrics = ["recall"]
         return fig_metrics_comparison(metrics)
 
     # ── 7) Botón "Limpiar formulario": restaura los 21 inputs a sus
@@ -621,7 +1058,6 @@ def register_model_callbacks(app):
     @app.callback(
         *[Output(f"sim-{name}", "value", allow_duplicate=True)
           for name in SIM_INPUT_FIELDS],
-        Output("sim-model-select", "value", allow_duplicate=True),
         Input("sim-clear-button", "n_clicks"),
         prevent_initial_call=True,
     )
@@ -629,8 +1065,9 @@ def register_model_callbacks(app):
         if not n_clicks:
             return no_update
         defaults = [SIM_DEFAULTS[name] for name in SIM_INPUT_FIELDS]
-        return (*defaults, get_best_model_name())
+        return tuple(defaults)
 
+    # ── 8) Al pulsar "Limpiar", también restablecemos el panel de resultado.
     # ── 8) Al pulsar "Limpiar", también restablecemos el panel de resultado.
     @app.callback(
         Output("sim-result-panel", "children", allow_duplicate=True),
@@ -640,4 +1077,30 @@ def register_model_callbacks(app):
     def reset_result_panel_on_clear(n_clicks):
         if not n_clicks:
             return no_update
+
         return _initial_result_panel()
+
+    # ── 9) Distribución de probabilidades predichas (mejor modelo) ───────────
+    #     Histograma por clase real con línea vertical en el threshold final.
+    @app.callback(
+        Output("ml-proba-distribution", "figure"),
+        Input("ml-proba-distribution", "id"),  # dummy: se dispara al cargar
+    )
+    def render_proba_distribution(_):
+        return fig_proba_distribution()
+
+    # ── 10) Trade-off Precision/Recall/F1 vs threshold ───────────────────────
+    @app.callback(
+        Output("ml-threshold-tradeoff", "figure"),
+        Input("ml-threshold-tradeoff", "id"),
+    )
+    def render_threshold_tradeoff(_):
+        return fig_threshold_tradeoff()
+
+    # ── 11) Heatmap Recall (Modelo_base × Balanceo) ──────────────────────────
+    @app.callback(
+        Output("ml-three-metric-heatmaps", "figure"),
+        Input("ml-three-metric-heatmaps", "id"),
+    )
+    def render_three_metric_heatmaps(_):
+        return fig_three_metric_heatmaps()

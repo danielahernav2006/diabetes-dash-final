@@ -1,0 +1,17 @@
+{
+    "modelo": "XGBoost + class_weight",
+    "modelo_base": "XGBoost",
+    "balanceo": "class_weight",
+    "threshold_default": 0.5,
+    "threshold_final": 0.32967254519462585,
+    "accuracy_default": 0.7207111321349732,
+    "precision_default": 0.305973003989289,
+    "recall_default": 0.7920497948790494,
+    "f1_default": 0.44142226426994635,
+    "roc_auc": 0.8270609672011899,
+    "pr_auc": 0.42296012738070343,
+    "accuracy_threshold": 0.6083451592557553,
+    "precision_threshold": 0.25023411893241765,
+    "recall_threshold": 0.9072004526807186,
+    "f1_threshold": 0.39226840382909745
+}
